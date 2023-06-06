@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/chatGPT-help/static/css/main.825187be.css",
-    "main.js": "/chatGPT-help/static/js/main.1ce62bd7.js",
+    "main.js": "/chatGPT-help/static/js/main.afed58cd.js",
     "static/js/787.4cfa92cb.chunk.js": "/chatGPT-help/static/js/787.4cfa92cb.chunk.js",
     "index.html": "/chatGPT-help/index.html",
     "main.825187be.css.map": "/chatGPT-help/static/css/main.825187be.css.map",
-    "main.1ce62bd7.js.map": "/chatGPT-help/static/js/main.1ce62bd7.js.map",
+    "main.afed58cd.js.map": "/chatGPT-help/static/js/main.afed58cd.js.map",
     "787.4cfa92cb.chunk.js.map": "/chatGPT-help/static/js/787.4cfa92cb.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.825187be.css",
-    "static/js/main.1ce62bd7.js"
+    "static/js/main.afed58cd.js"
   ]
 }
