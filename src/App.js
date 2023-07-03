@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Configuration, OpenAIApi } from 'openai'
 import axios from 'axios'
 
 function createMessages(prompt) {
@@ -35,13 +34,6 @@ async function getCurrentWeather(city) {
   let weatherInfo = await axios.get(
     `http://api.weatherapi.com/v1/current.json?key=${weatherKey}&q=${city}`
   )
-
-  // const res = {
-  //   condition: weatherInfo.data.current.condition.text,
-  //   temperature_celsius: weatherInfo.data.current.temp_c,
-  //   feels_like_celsius: weatherInfo.data.current.feelslike_c,
-  //   wind_kph: weatherInfo.data.current.wind_kph
-  // }
 
   return {
     condition: weatherInfo.data.current.condition.text,
@@ -124,10 +116,8 @@ function App() {
         },
       });
   
-      // return second_response.data
       setResponse(second_response.data.choices[0].message.content)
     }
-    // setResponse(serverResponse.data.choices[0].message.content)
   }
 
   return (
