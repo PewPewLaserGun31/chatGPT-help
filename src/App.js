@@ -1,87 +1,61 @@
 import { useState } from 'react'
 import { Configuration, OpenAIApi } from 'openai'
-import { createClient } from 'backendless-console-sdk'
+import axios from 'axios'
 
-const mystyle = {
-  color: 'white',
-  backgroundColor: 'DodgerBlue',
-  padding: '10px',
-  fontFamily: 'Arial',
-}
-
-function createMessages(prompt, tablesSchemas) {
+function createMessages(prompt) {
   return [
     {
       role: 'user',
-      content: `### Backendless tables, with their properties: 
-        #Orders(orderItems, updated, price, objectId, created, )
-        #OrderItems(item, updated, quantity, created, objectId, )
-        #Items(images, name, price, created, objectId, updated, )
-        #Customers(address, orders, created, objectId, updated, name, )
-        #Address(geo, street, updated, city, objectId, created, )
-        ### Try to create where clause to retrieve all Items related to OrderItems related to Orders related to Customers related to Address with objectId = \"58C9453B-9442-4857-ABD4-3C034E0E6C2C\".
-        # Please, respond with where clause only.
-        # Please use syntax like in this example: "OrderItems[objectId in (Orders[objectId in (Customers[objectId = 'B36E2D4C-89F4-4195-BDBE-12E03A7FACEC'].orders.objectId)].orderItems.objectId)".
-        # Backendless can't use SELECT in subqueries.
-        # Please don't use JOIN.
-        # objectId column is primary key.
-        # Table names in query should start from uppercase letter.
-        # Please, respond with template "Where: <where clause> \nSort by: <sort by> \nGroup by <group by>".`,
-    },
-    {
-      role: 'assistant',
-      content: `Where: Items[objectId in (OrderItems[objectId in (Orders[objectId in (Customers[objectId='58C9453B-9442-4857-ABD4-3C034E0E6C2C'].orders.objectId)].orderItems.objectId)].item.objectId)]\nSort by: <sort by> \nGroup by <group by>`,
-    },
-    {
-      role: 'user',
-      content: `Not Customers with objectId = '58C9453B-9442-4857-ABD4-3C034E0E6C2C', but Customers.address.objectId = '58C9453B-9442-4857-ABD4-3C034E0E6C2C'`,
-    },
-    {
-      role: 'assistant',
-      content: `Where: Items[objectId in (OrderItems[objectId in (Orders[objectId in (Customers[address.objectId='58C9453B-9442-4857-ABD4-3C034E0E6C2C'].orders.objectId)].orderItems.objectId)].item.objectId)]\nSort by: <sort by> \nGroup by <group by>`,
-    },
-    {
-      role: 'user',
-      content: `Thank you, this one was correct.`,
-    },
-    {
-      role: 'assistant',
-      content: `You're welcome! Let me know if you have any more questions.`,
-    },
-    {
-      role: 'user',
-      content:
-        `### Backendless tables, with their properties: ${tablesSchemas}` +
-        `### Try to create where clause to retrieve ${prompt}` +
-        '# Please, respond with where clause only.' +
-        '# Please use syntax like in this example: "OrderItems[objectId in (Orders[objectId in (Customers[objectId = \'B36E2D4C-89F4-4195-BDBE-12E03A7FACEC\'].orders.objectId)].orderItems.objectId)".' +
-        "# Backendless can't use SELECT in subqueries." +
-        "# Please don't use JOIN." +
-        '# objectId column is primary key.' +
-        '# Table names in query should start from uppercase letter.' +
-        '# Please, respond with template "Where: <where clause> \nSort by: <sort by> \nGroup by <group by>".`',
+      content: prompt,
     },
   ]
 }
 
-function createTableSchemas(tables) {
-  let res = '\n'
+function createAIFunctions() {
+  return [
+    {
+      name: 'getCurrentWeather',
+      description: 'Get the current temperature, "feels like" temperature, weather condition and wind speed in kph in a given city',
+      parameters: {
+        type: 'object',
+        properties: {
+          city: {
+            type: 'string',
+            description: 'The city, e.g. Kyiv',
+          },
+        },
+        required: ['city'],
+      },
+    },
+  ]
+}
 
-  for (const table of tables) {
-    if (table.system) continue
+async function getCurrentWeather(city) {
+  const { weatherKey } = await getKeys()
+  let weatherInfo = await axios.get(
+    `http://api.weatherapi.com/v1/current.json?key=${weatherKey}&q=${city}`
+  )
 
-    res += `#${table.name}(`
+  // const res = {
+  //   condition: weatherInfo.data.current.condition.text,
+  //   temperature_celsius: weatherInfo.data.current.temp_c,
+  //   feels_like_celsius: weatherInfo.data.current.feelslike_c,
+  //   wind_kph: weatherInfo.data.current.wind_kph
+  // }
 
-    for (const column of table.columns) {
-      if (column.name === 'ownerId') continue
-
-      res += `${column.name}, `
-    }
-
-    res += `)\n`
+  return {
+    condition: weatherInfo.data.current.condition.text,
+    temperature_celsius: weatherInfo.data.current.temp_c,
+    feels_like_celsius: weatherInfo.data.current.feelslike_c,
+    wind_kph: weatherInfo.data.current.wind_kph
   }
+}
 
-  return res
+async function getKeys() {
+  const response = await fetch(
+    'https://steamyjail.backendless.app/api/services/Test/chatgptKey'
+  )
+  return response.json()
 }
 
 function App() {
@@ -93,69 +67,91 @@ function App() {
   }
 
   const handleReset = () => {
-    setInputValue("")
+    setInputValue('')
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    const apiClient = createClient(
-      'https://develop.backendless.com',
-      'jxyvhkkihvkadfndyfkbjbsgbgruqpgnaavp'
+    const messages = createMessages(inputValue)
+    const functions = createAIFunctions()
+
+    const { aiKey } = await getKeys()
+
+    const ai_response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo-0613',
+        messages,
+        functions,
+        function_call: 'auto',
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${aiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
     )
 
-    // const res = await apiClient.user.login('alex.sosnovsky@backendlessmail.com', 'wzbox0ho1i79()')
+    const responseMessage = ai_response.data.choices[0].message
 
-    // console.log(res)
-
-    const tablesData = await apiClient.tables.get(
-      '24791ABF-AE63-D664-FF20-E4CDD97BD400'
-    )
-
-    console.log(tablesData)
-
-    const tablesSchemas = createTableSchemas(tablesData.tables)
-
-    const messages = createMessages(inputValue, tablesSchemas)
-
-    console.log(messages)
-
-    const configuration = new Configuration({
-      apiKey: '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',
-    })
-
-    const openai = new OpenAIApi(configuration)
-
-    console.log(inputValue)
-
-    const serverResponse = await openai.createChatCompletion({
-      model: 'gpt-3.5-turbo',
-      messages: messages,
-    })
-
-    setResponse(serverResponse.data.choices[0].message.content)
+    if (responseMessage.function_call) {
+      const availableFunctions = {
+        getCurrentWeather,
+      };
+      const functionName = responseMessage.function_call.name;
+      const functionToCall = availableFunctions[functionName];
+      const functionArgs = JSON.parse(responseMessage.function_call.arguments);
+      const functionResponse = await functionToCall(
+        functionArgs.city
+      );
+  
+      messages.push(responseMessage);
+      messages.push({
+        role: 'function',
+        name: functionName,
+        content: JSON.stringify(functionResponse),
+      });
+  
+      const second_response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: 'gpt-3.5-turbo-0613',
+        messages,
+      }, {
+        headers: {
+          'Authorization': `Bearer ${aiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+  
+      // return second_response.data
+      setResponse(second_response.data.choices[0].message.content)
+    }
+    // setResponse(serverResponse.data.choices[0].message.content)
   }
 
   return (
-      <div className="card">
-        <h2>ChatGPT query help</h2>
-        <form onSubmit={handleSubmit}>
-          <label className="input">
-            <input
-              className="input__field"
-              type="text"
-              placeholder=" "
-              value={inputValue}
-              onChange={handleChange}
-            />
-          </label>
-          <div className="button-group">
-            <button>Submit</button>
-            <button type="reset" onClick={handleReset}>Reset</button>
-          </div>
-        </form>
-        <p>Response: {response}</p>
-      </div>
+    <div className="card">
+      <h2>ChatGPT query help</h2>
+      <form onSubmit={handleSubmit}>
+        <label className="input">
+          <input
+            className="input__field"
+            type="text"
+            placeholder=" "
+            value={inputValue}
+            onChange={handleChange}
+          />
+        </label>
+        <div className="button-group">
+          <button>Submit</button>
+          <button type="reset" onClick={handleReset}>
+            Reset
+          </button>
+        </div>
+      </form>
+      <p>Response: {response}</p>
+    </div>
   )
 }
 
